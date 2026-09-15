@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { WeatherCardProps } from "../types/cuaca";
+import { WeatherCardProps } from "../../types/cuaca";
 export default function WeatherCard({ kota, suhu, tingkatAQI }: WeatherCardProps) {
 const warnaAQI = tingkatAQI === "BAIK" ? "green" : "orange";
 return (
