@@ -1,5 +1,5 @@
 // app/index.tsx
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { useState, useEffect } from "react";
 // Catatan: gunakan ../components/ jika file berada di dalam folder app/
 // yang sejajar dengan folder components/
@@ -19,8 +19,9 @@ if (!riwayat.includes(kota)) {
 setRiwayat([...riwayat, kota]);
 }
 }
+const paddingTop = Platform.OS === "web" ? 80 : 16;
 return (
-<View style={{ padding: 16, gap: 16 }}>
+<View style={{ padding: 16, gap: 16, paddingTop }}>
 <SearchBox onCari={handleCari} />
 <WeatherCard kota={kotaAktif} suhu={29} tingkatAQI="BAIK" />
 <RiwayatList daftarKota={riwayat} />
