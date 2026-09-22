@@ -1,11 +1,11 @@
-// app/(tabs)/riwayat.tsx
-import { View } from "react-native";
+// app/(tabs)/riwayat.tsx (ganti <View> terluar menjadi <SafeAreaView>)
+import { SafeAreaView } from "react-native-safe-area-context";
 import RiwayatList from "../../components/RiwayatList";
 export default function TabRiwayat() {
-const daftarKota = ["Pekalongan", "Jakarta", "Semarang"]; // data contoh sementara
+const daftarKota = ["Pekalongan", "Jakarta", "Semarang"];
 return (
-<View style={{ padding: 16 }}>
+<SafeAreaView style={{ flex: 1, padding: 16 }}>
 <RiwayatList daftarKota={daftarKota} />
-</View>
+</SafeAreaView>
 );
 }
