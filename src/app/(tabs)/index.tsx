@@ -17,7 +17,7 @@ export default function HalamanUtama() {
  const { width } = useWindowDimensions();
  const isTablet = width > 768;
 
- const teksTertunda = useDebounce(teksCari, 500);
+ const teksTertunda = useDebounce(teksCari, 800);
 
  useEffect(() => {
  if (teksTertunda.trim().length === 0) {
@@ -55,7 +55,7 @@ export default function HalamanUtama() {
 
  {pesanError && (
  <View style={{ gap: spacing.kecil }}>
- <Text>{pesanError}</Text>
+ <Text accessibilityLabel={pesanError}>{pesanError}</Text>
  <Button title="Coba Lagi" onPress={() => ambilData(teksTertunda)} />
  </View>
  )}
@@ -63,7 +63,15 @@ export default function HalamanUtama() {
  {!sedangMemuat &&
  !pesanError &&
  teksTertunda.trim().length > 0 &&
- hasil.length === 0 && <Text>Kota tidak ditemukan</Text>}
+ hasil.length === 0 && (
+ <Text accessibilityLabel="Kota tidak ditemukan">Kota tidak ditemukan</Text>
+ )}
+
+ {hasil.length > 0 && (
+ <Text accessibilityLabel={`Ditemukan ${hasil.length} kota`}>
+ Ditemukan {hasil.length} kota
+ </Text>
+ )}
 
  {hasil.map((kota) => (
  <WeatherCard key={kota.id} kota={kota.name} suhu={29} tingkatAQI="BAIK" />
