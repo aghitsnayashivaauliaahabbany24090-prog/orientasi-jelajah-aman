@@ -1,4 +1,4 @@
-// constants/styles.ts
+// src/constants/styles.ts
 export const typeScale = {
 judul: 24, // nama kota, judul halaman
 subjudul: 16, // label section

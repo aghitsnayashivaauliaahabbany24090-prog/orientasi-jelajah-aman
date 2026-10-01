@@ -1,4 +1,4 @@
-// types/cuaca.ts
+// src/types/cuaca.ts
 export interface DataCuaca {
 kota: string;
 suhu: number;
