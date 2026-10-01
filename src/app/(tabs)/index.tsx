@@ -1,5 +1,5 @@
 // app/(tabs)/index.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { View, Text, ActivityIndicator, Button, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SearchBox from "../../components/SearchBox";
@@ -16,6 +16,9 @@ export default function HalamanUtama() {
  const [pesanError, setPesanError] = useState<string | null>(null);
  const { width } = useWindowDimensions();
  const isTablet = width > 768;
+ // Menandai permintaan mana yang masih berlaku, agar respons yang telat
+ // tidak menimpa hasil pencarian yang lebih baru.
+ const idPermintaan = useRef(0);
 
  const teksTertunda = useDebounce(teksCari, 800);
 
@@ -23,24 +26,31 @@ export default function HalamanUtama() {
  const adaKataKunci = teksTertunda.trim().length > 0;
  const hasilTampil = adaKataKunci ? hasil : [];
  const errorTampil = adaKataKunci ? pesanError : null;
+ const sedangMemuatTampil = adaKataKunci && sedangMemuat;
 
  useEffect(() => {
  if (!adaKataKunci) {
+ idPermintaan.current++; // batalkan permintaan yang masih berjalan
  return;
  }
  ambilData(teksTertunda);
  }, [teksTertunda, adaKataKunci]);
 
  async function ambilData(nama: string) {
+ const iniPermintaanSaya = ++idPermintaan.current;
  setSedangMemuat(true);
  setPesanError(null);
  try {
  const data = await cariKota(nama);
+ if (iniPermintaanSaya !== idPermintaan.current) return; // sudah usang
  setHasil(data);
  } catch {
+ if (iniPermintaanSaya !== idPermintaan.current) return; // sudah usang
  setPesanError("Gagal mengambil data. Periksa koneksi internet Anda.");
  } finally {
+ if (iniPermintaanSaya === idPermintaan.current) {
  setSedangMemuat(false);
+ }
  }
  }
 
@@ -54,7 +64,7 @@ export default function HalamanUtama() {
  >
  <SearchBox onCari={setTeksCari} />
 
- {sedangMemuat && <ActivityIndicator />}
+ {sedangMemuatTampil && <ActivityIndicator />}
 
  {errorTampil && (
  <View style={{ gap: spacing.kecil }}>
@@ -63,7 +73,7 @@ export default function HalamanUtama() {
  </View>
  )}
 
- {!sedangMemuat &&
+ {!sedangMemuatTampil &&
  !errorTampil &&
  adaKataKunci &&
  hasilTampil.length === 0 && (
