@@ -19,14 +19,17 @@ export default function HalamanUtama() {
 
  const teksTertunda = useDebounce(teksCari, 800);
 
+ // Diturunkan, bukan disinkronkan di dalam effect, agar tidak memicu render bertingkat
+ const adaKataKunci = teksTertunda.trim().length > 0;
+ const hasilTampil = adaKataKunci ? hasil : [];
+ const errorTampil = adaKataKunci ? pesanError : null;
+
  useEffect(() => {
- if (teksTertunda.trim().length === 0) {
- setHasil([]);
- setPesanError(null);
+ if (!adaKataKunci) {
  return;
  }
  ambilData(teksTertunda);
- }, [teksTertunda]);
+ }, [teksTertunda, adaKataKunci]);
 
  async function ambilData(nama: string) {
  setSedangMemuat(true);
@@ -53,27 +56,27 @@ export default function HalamanUtama() {
 
  {sedangMemuat && <ActivityIndicator />}
 
- {pesanError && (
+ {errorTampil && (
  <View style={{ gap: spacing.kecil }}>
- <Text accessibilityLabel={pesanError}>{pesanError}</Text>
+ <Text accessibilityLabel={errorTampil}>{errorTampil}</Text>
  <Button title="Coba Lagi" onPress={() => ambilData(teksTertunda)} />
  </View>
  )}
 
  {!sedangMemuat &&
- !pesanError &&
- teksTertunda.trim().length > 0 &&
- hasil.length === 0 && (
+ !errorTampil &&
+ adaKataKunci &&
+ hasilTampil.length === 0 && (
  <Text accessibilityLabel="Kota tidak ditemukan">Kota tidak ditemukan</Text>
  )}
 
- {hasil.length > 0 && (
- <Text accessibilityLabel={`Ditemukan ${hasil.length} kota`}>
- Ditemukan {hasil.length} kota
+ {hasilTampil.length > 0 && (
+ <Text accessibilityLabel={`Ditemukan ${hasilTampil.length} kota`}>
+ Ditemukan {hasilTampil.length} kota
  </Text>
  )}
 
- {hasil.map((kota) => (
+ {hasilTampil.map((kota) => (
  <WeatherCard key={kota.id} kota={kota.name} suhu={29} tingkatAQI="BAIK" />
  ))}
  </SafeAreaView>

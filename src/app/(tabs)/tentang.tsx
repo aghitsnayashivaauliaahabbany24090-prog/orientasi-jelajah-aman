@@ -1,5 +1,5 @@
 // app/(tabs)/tentang.tsx
-import { View, Text } from "react-native";
+import { Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { typeScale, spacing } from "../../constants/styles";
 export default function TabTentang() {
