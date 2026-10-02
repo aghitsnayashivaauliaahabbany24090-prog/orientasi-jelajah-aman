@@ -22,6 +22,7 @@ export default function SearchBox({ onCari }: SearchBoxProps) {
  value={teks}
  onChangeText={handleChange}
  accessibilityLabel="Cari cuaca untuk kota yang dimasukkan"
+ accessibilityHint="Ketik nama kota untuk mencari hasil cuaca"
  style={{
  borderWidth: 1,
  padding: spacing.kecil,
