@@ -215,7 +215,18 @@ export default function HalamanUtama() {
             Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
             {cuaca.saatIni.kecepatanAngin} km/j
           </Text>
+          <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+            Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
+            {cuaca.harian.suhuMaksimal[0]}°
+          </Text>
         </>
+      )}
+
+      {kualitasUdara && (
+        <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+          Partikel halus: PM2.5 {kualitasUdara.pm25} µg/m³ • PM10{" "}
+          {kualitasUdara.pm10} µg/m³
+        </Text>
       )}
 
       <AtribusiCuaca />

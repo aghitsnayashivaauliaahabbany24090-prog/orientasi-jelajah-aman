@@ -2,7 +2,7 @@
 import { DataCuacaLengkap } from "../types/weather";
 
 const BASE_URL = "https://api.open-meteo.com/v1/forecast";
-const BATAS_WAKTU_MS = 8000;
+const BATAS_WAKTU_MS = 3000;
 
 export async function ambilCuaca(
   latitude: number,
