@@ -50,10 +50,13 @@ export default function HalamanUtama() {
   // Diturunkan, bukan disinkronkan di dalam effect, agar tidak memicu render bertingkat
   const adaKataKunci = teksTertunda.trim().length > 0;
   const hasilTampil = adaKataKunci ? hasilPencarian : [];
-  // "Sedang mencari"diturunkan dari kata kunci yang terakhir selesai diproses,
-  // sehingga tidak perlu setState sinkron di dalam effect.
+  // "Sedang mencari" diturunkan dari dua perbandingan, sehingga tidak perlu
+  // setState sinkron di dalam effect. Perbandingan dengan teksCari menutup
+  // jeda debounce: selama jeda itu teksTertunda masih kata kunci lama, jadi
+  // tanpa ini aplikasi sempat menampilkan "Kota tidak ditemukan" palsu.
   const sedangCariTampil =
-    adaKataKunci && teksTertunda !== kataKunciSelesaiDicari;
+    adaKataKunci &&
+    (teksCari !== teksTertunda || teksTertunda !== kataKunciSelesaiDicari);
   const errorCariTampil = adaKataKunci && !sedangCariTampil ? pesanCari : null;
 
   useEffect(() => {
@@ -78,6 +81,22 @@ export default function HalamanUtama() {
         setKataKunciSelesaiDicari(teksTertunda);
       });
   }, [teksTertunda, adaKataKunci, ulanganCari]);
+
+  // Kota yang sudah dimuat tidak lagi relevan begitu pengguna mengubah kata
+  // kuncinya. Kalau tidak dibersihkan di sini, kartu kota sebelumnya tetap
+  // tampil (dan daftar hasil sebelumnya masih bisa diklik) sepanjang
+  // pencarian baru berjalan.
+  function ubahTeksCari(nilaiBaru: string) {
+    setTeksCari(nilaiBaru);
+    requestIdRef.current++; // batalkan pemuatan cuaca kota yang lama
+    setHasilPencarian([]);
+    setPesanCari(null);
+    setKotaTerpilih(null);
+    setCuaca(null);
+    setKualitasUdara(null);
+    setPesanError(null);
+    setSedangMemuat(false);
+  }
 
   async function pilihKota(kota: HasilGeocoding) {
     setKotaTerpilih(kota);
@@ -111,7 +130,7 @@ export default function HalamanUtama() {
         gap: spacing.sedang,
       }}
     >
-      <SearchBox onCari={setTeksCari} />
+      <SearchBox onCari={ubahTeksCari} />
 
       {sedangCariTampil && (
         <ActivityIndicator accessibilityLabel="Sedang mencari kota" />
@@ -185,19 +204,18 @@ export default function HalamanUtama() {
       )}
 
       {cuaca && kualitasUdara && kotaTerpilih && !sedangMemuat && (
-        <WeatherCard
-          kota={kotaTerpilih.name}
-          suhu={cuaca.saatIni.suhu}
-          tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
-          indeksAQI={kualitasUdara.indeksAQI}
-        />
-      )}
-
-      {cuaca && (
-        <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-          Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
-          {cuaca.saatIni.kecepatanAngin} km/j
-        </Text>
+        <>
+          <WeatherCard
+            kota={kotaTerpilih.name}
+            suhu={cuaca.saatIni.suhu}
+            tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
+            indeksAQI={kualitasUdara.indeksAQI}
+          />
+          <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+            Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
+            {cuaca.saatIni.kecepatanAngin} km/j
+          </Text>
+        </>
       )}
 
       <AtribusiCuaca />
