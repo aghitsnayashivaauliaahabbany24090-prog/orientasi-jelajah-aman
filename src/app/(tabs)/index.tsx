@@ -1,5 +1,5 @@
 // src/app/(tabs)/index.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import SearchBox from "../../components/SearchBox";
 import WeatherCard from "../../components/WeatherCard";
 import AtribusiCuaca from "../../components/AtribusiCuaca";
@@ -23,6 +23,7 @@ import {
   mintaIzinLokasi,
   ambilKoordinatSaatIni,
 } from "../../services/locationService";
+import { ambilSemuaFavorit } from "../../services/favoritStorage";
 import { labelKodeCuaca } from "../../constants/weatherCodes";
 import { HasilGeocoding } from "../../types/geocoding";
 import { DataCuacaLengkap, DataKualitasUdara } from "../../types/weather";
@@ -44,6 +45,7 @@ export default function HalamanUtama() {
   const [sedangMemuat, setSedangMemuat] = useState(false);
   const [pesanError, setPesanError] = useState<string | null>(null);
   const [pesanLokasi, setPesanLokasi] = useState<string | null>(null);
+  const [daftarIdFavorit, setDaftarIdFavorit] = useState<number[]>([]);
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -58,6 +60,20 @@ export default function HalamanUtama() {
     adaKataKunci &&
     (teksCari !== teksTertunda || teksTertunda !== kataKunciSelesaiDicari);
   const errorCariTampil = adaKataKunci && !sedangCariTampil ? pesanCari : null;
+
+  // Daftar id favorit dimuat ulang setiap kali tab ini difokuskan, karena
+  // favorit bisa ditambah atau dihapus lewat modal dan tab Riwayat. Tanpa ini
+  // tombol "Tambahkan ke Favorit" masih tampil untuk kota yang sudah tersimpan.
+  useFocusEffect(
+    useCallback(() => {
+      ambilSemuaFavorit().then((daftar) =>
+        setDaftarIdFavorit(daftar.map((k) => k.id)),
+      );
+    }, []),
+  );
+
+  const kotaSudahFavorit =
+    kotaTerpilih !== null && daftarIdFavorit.includes(kotaTerpilih.id);
 
   useEffect(() => {
     if (!adaKataKunci) {
@@ -262,20 +278,22 @@ export default function HalamanUtama() {
               Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
               {cuaca.harian.suhuMaksimal[0]}°
             </Text>
-            <Button
-              title="Tambahkan ke Favorit"
-              onPress={() =>
-                router.push({
-                  pathname: "/tambah-favorit",
-                  params: {
-                    id: String(kotaTerpilih.id),
-                    nama: kotaTerpilih.name,
-                    lat: String(kotaTerpilih.latitude),
-                    lon: String(kotaTerpilih.longitude),
-                  },
-                })
-              }
-            />
+            {!kotaSudahFavorit && (
+              <Button
+                title="Tambahkan ke Favorit"
+                onPress={() =>
+                  router.push({
+                    pathname: "/tambah-favorit",
+                    params: {
+                      id: String(kotaTerpilih.id),
+                      nama: kotaTerpilih.name,
+                      lat: String(kotaTerpilih.latitude),
+                      lon: String(kotaTerpilih.longitude),
+                    },
+                  })
+                }
+              />
+            )}
           </>
         )}
 
