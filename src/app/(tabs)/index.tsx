@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import SearchBox from "../../components/SearchBox";
 import WeatherCard from "../../components/WeatherCard";
 import AtribusiCuaca from "../../components/AtribusiCuaca";
@@ -17,6 +18,10 @@ import { cariKota } from "../../services/geocodingService";
 import { ambilCuaca } from "../../services/weatherService";
 import { ambilKualitasUdara } from "../../services/airQualityService";
 import { konversiTingkatAQI } from "../../services/weatherAdapter";
+import {
+  mintaIzinLokasi,
+  ambilKoordinatSaatIni,
+} from "../../services/locationService";
 import { labelKodeCuaca } from "../../constants/weatherCodes";
 import { HasilGeocoding } from "../../types/geocoding";
 import { DataCuacaLengkap, DataKualitasUdara } from "../../types/weather";
@@ -35,6 +40,7 @@ export default function HalamanUtama() {
   const [pesanCari, setPesanCari] = useState<string | null>(null);
   const [sedangMemuat, setSedangMemuat] = useState(false);
   const [pesanError, setPesanError] = useState<string | null>(null);
+  const [pesanLokasi, setPesanLokasi] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -122,6 +128,33 @@ export default function HalamanUtama() {
     }
   }
 
+  async function gunakanLokasiSaatIni() {
+    const status = await mintaIzinLokasi();
+    if (status === "denied") {
+      setPesanLokasi(
+        "Izin lokasi ditolak. Silakan cari kota secara manual di atas."
+      );
+      return;
+    }
+    if (status === "unavailable") {
+      setPesanLokasi(
+        "Layanan lokasi tidak aktif di perangkat ini. Silakan cari kota secara manual."
+      );
+      return;
+    }
+    setPesanLokasi(null);
+    const koordinat = await ambilKoordinatSaatIni();
+    // id: -1 menandai ini lokasi GPS, bukan hasil pencarian kota, dan country
+    // dikosongkan karena tidak relevan untuk koordinat mentah.
+    pilihKota({
+      id: -1,
+      name: "Lokasi Saat Ini",
+      latitude: koordinat.latitude,
+      longitude: koordinat.longitude,
+      country: "",
+    });
+  }
+
   return (
     <SafeAreaView
       style={{
@@ -131,6 +164,10 @@ export default function HalamanUtama() {
       }}
     >
       <SearchBox onCari={ubahTeksCari} />
+
+      <Button title="Gunakan Lokasi Saat Ini" onPress={gunakanLokasiSaatIni} />
+
+      {pesanLokasi && <Text>{pesanLokasi}</Text>}
 
       {sedangCariTampil && (
         <ActivityIndicator accessibilityLabel="Sedang mencari kota" />
@@ -219,6 +256,20 @@ export default function HalamanUtama() {
             Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
             {cuaca.harian.suhuMaksimal[0]}°
           </Text>
+          <Button
+            title="Tambahkan ke Favorit"
+            onPress={() =>
+              router.push({
+                pathname: "/tambah-favorit",
+                params: {
+                  id: String(kotaTerpilih.id),
+                  nama: kotaTerpilih.name,
+                  lat: String(kotaTerpilih.latitude),
+                  lon: String(kotaTerpilih.longitude),
+                },
+              })
+            }
+          />
         </>
       )}
 
