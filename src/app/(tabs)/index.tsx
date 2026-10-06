@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Button,
   TouchableOpacity,
+  ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,10 +33,12 @@ export default function HalamanUtama() {
   const [hasilPencarian, setHasilPencarian] = useState<HasilGeocoding[]>([]);
   const [kotaTerpilih, setKotaTerpilih] = useState<HasilGeocoding | null>(null);
   const [cuaca, setCuaca] = useState<DataCuacaLengkap | null>(null);
-  const [kualitasUdara, setKualitasUdara] = useState<DataKualitasUdara | null>(null);
-  const [kataKunciSelesaiDicari, setKataKunciSelesaiDicari] = useState<string | null>(
-    null
+  const [kualitasUdara, setKualitasUdara] = useState<DataKualitasUdara | null>(
+    null,
   );
+  const [kataKunciSelesaiDicari, setKataKunciSelesaiDicari] = useState<
+    string | null
+  >(null);
   const [ulanganCari, setUlanganCari] = useState(0);
   const [pesanCari, setPesanCari] = useState<string | null>(null);
   const [sedangMemuat, setSedangMemuat] = useState(false);
@@ -44,22 +47,13 @@ export default function HalamanUtama() {
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
-  // Nomor urut permintaan geocoding, agar respons yang telat tidak menimpa
-  // hasil pencarian yang lebih baru.
   const idPermintaan = useRef(0);
-  // Nomor urut permintaan cuaca + AQI, mencegah respons kota lama menimpa
-  // kota yang baru saja dipilih saat pengguna ganti kota dengan cepat.
   const requestIdRef = useRef(0);
 
   const teksTertunda = useDebounce(teksCari, 800);
 
-  // Diturunkan, bukan disinkronkan di dalam effect, agar tidak memicu render bertingkat
   const adaKataKunci = teksTertunda.trim().length > 0;
   const hasilTampil = adaKataKunci ? hasilPencarian : [];
-  // "Sedang mencari" diturunkan dari dua perbandingan, sehingga tidak perlu
-  // setState sinkron di dalam effect. Perbandingan dengan teksCari menutup
-  // jeda debounce: selama jeda itu teksTertunda masih kata kunci lama, jadi
-  // tanpa ini aplikasi sempat menampilkan "Kota tidak ditemukan" palsu.
   const sedangCariTampil =
     adaKataKunci &&
     (teksCari !== teksTertunda || teksTertunda !== kataKunciSelesaiDicari);
@@ -132,13 +126,13 @@ export default function HalamanUtama() {
     const status = await mintaIzinLokasi();
     if (status === "denied") {
       setPesanLokasi(
-        "Izin lokasi ditolak. Silakan cari kota secara manual di atas."
+        "Izin lokasi ditolak. Silakan cari kota secara manual di atas.",
       );
       return;
     }
     if (status === "unavailable") {
       setPesanLokasi(
-        "Layanan lokasi tidak aktif di perangkat ini. Silakan cari kota secara manual."
+        "Layanan lokasi tidak aktif di perangkat ini. Silakan cari kota secara manual.",
       );
       return;
     }
@@ -160,127 +154,140 @@ export default function HalamanUtama() {
       style={{
         flex: 1,
         padding: isTablet ? spacing.besar : spacing.sedang,
-        gap: spacing.sedang,
       }}
     >
-      <SearchBox onCari={ubahTeksCari} />
+      <ScrollView
+        contentContainerStyle={{ gap: spacing.sedang }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <SearchBox onCari={ubahTeksCari} />
 
-      <Button title="Gunakan Lokasi Saat Ini" onPress={gunakanLokasiSaatIni} />
+        <Button
+          title="Gunakan Lokasi Saat Ini"
+          onPress={gunakanLokasiSaatIni}
+        />
 
-      {pesanLokasi && <Text>{pesanLokasi}</Text>}
+        {pesanLokasi && <Text>{pesanLokasi}</Text>}
 
-      {sedangCariTampil && (
-        <ActivityIndicator accessibilityLabel="Sedang mencari kota" />
-      )}
+        {sedangCariTampil && (
+          <ActivityIndicator accessibilityLabel="Sedang mencari kota" />
+        )}
 
-      {!sedangCariTampil &&
-        !errorCariTampil &&
-        adaKataKunci &&
-        hasilTampil.length === 0 && (
-          <Text accessibilityLabel="Kota tidak ditemukan" accessibilityRole="alert">
-            Kota tidak ditemukan
+        {!sedangCariTampil &&
+          !errorCariTampil &&
+          adaKataKunci &&
+          hasilTampil.length === 0 && (
+            <Text
+              accessibilityLabel="Kota tidak ditemukan"
+              accessibilityRole="alert"
+            >
+              Kota tidak ditemukan
+            </Text>
+          )}
+
+        {errorCariTampil && (
+          <View style={{ gap: spacing.kecil }}>
+            <Text
+              accessibilityLabel={errorCariTampil}
+              accessibilityRole="alert"
+            >
+              {errorCariTampil}
+            </Text>
+            <Button
+              title="Coba Lagi"
+              onPress={() => setUlanganCari((n) => n + 1)}
+              accessibilityLabel="Coba cari kota lagi"
+            />
+          </View>
+        )}
+
+        {hasilTampil.length > 0 && (
+          <Text
+            accessibilityLabel={`Ditemukan ${hasilTampil.length} kota`}
+            accessibilityRole="header"
+            style={{ fontSize: typeScale.subjudul, fontWeight: "600" }}
+          >
+            Ditemukan {hasilTampil.length} kota
           </Text>
         )}
 
-      {errorCariTampil && (
-        <View style={{ gap: spacing.kecil }}>
-          <Text accessibilityLabel={errorCariTampil} accessibilityRole="alert">
-            {errorCariTampil}
-          </Text>
-          <Button
-            title="Coba Lagi"
-            onPress={() => setUlanganCari((n) => n + 1)}
-            accessibilityLabel="Coba cari kota lagi"
-          />
-        </View>
-      )}
+        {hasilTampil.map((kota) => (
+          <TouchableOpacity
+            key={kota.id}
+            onPress={() => pilihKota(kota)}
+            accessibilityRole="button"
+            accessibilityLabel={`Lihat cuaca kota ${kota.name}`}
+            accessibilityHint="Mengambil data cuaca dan kualitas udara untuk kota ini"
+            style={{
+              padding: spacing.kecil,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#D5DCE3",
+            }}
+          >
+            <Text style={{ fontSize: typeScale.isi }}>{kota.name}</Text>
+          </TouchableOpacity>
+        ))}
 
-      {hasilTampil.length > 0 && (
-        <Text
-          accessibilityLabel={`Ditemukan ${hasilTampil.length} kota`}
-          accessibilityRole="header"
-          style={{ fontSize: typeScale.subjudul, fontWeight: "600" }}
-        >
-          Ditemukan {hasilTampil.length} kota
-        </Text>
-      )}
+        {sedangMemuat && (
+          <ActivityIndicator accessibilityLabel="Sedang memuat data cuaca" />
+        )}
 
-      {hasilTampil.map((kota) => (
-        <TouchableOpacity
-          key={kota.id}
-          onPress={() => pilihKota(kota)}
-          accessibilityRole="button"
-          accessibilityLabel={`Lihat cuaca kota ${kota.name}`}
-          accessibilityHint="Mengambil data cuaca dan kualitas udara untuk kota ini"
-          style={{
-            padding: spacing.kecil,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: "#D5DCE3",
-          }}
-        >
-          <Text style={{ fontSize: typeScale.isi }}>{kota.name}</Text>
-        </TouchableOpacity>
-      ))}
+        {pesanError && (
+          <View style={{ gap: spacing.kecil }}>
+            <Text accessibilityLabel={pesanError} accessibilityRole="alert">
+              {pesanError}
+            </Text>
+            <Button
+              title="Coba Lagi"
+              onPress={() => kotaTerpilih && pilihKota(kotaTerpilih)}
+              accessibilityLabel="Coba muat ulang data cuaca"
+            />
+          </View>
+        )}
 
-      {sedangMemuat && (
-        <ActivityIndicator accessibilityLabel="Sedang memuat data cuaca" />
-      )}
+        {cuaca && kualitasUdara && kotaTerpilih && !sedangMemuat && (
+          <>
+            <WeatherCard
+              kota={kotaTerpilih.name}
+              suhu={cuaca.saatIni.suhu}
+              tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
+              indeksAQI={kualitasUdara.indeksAQI}
+            />
+            <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+              Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
+              {cuaca.saatIni.kecepatanAngin} km/j
+            </Text>
+            <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+              Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
+              {cuaca.harian.suhuMaksimal[0]}°
+            </Text>
+            <Button
+              title="Tambahkan ke Favorit"
+              onPress={() =>
+                router.push({
+                  pathname: "/tambah-favorit",
+                  params: {
+                    id: String(kotaTerpilih.id),
+                    nama: kotaTerpilih.name,
+                    lat: String(kotaTerpilih.latitude),
+                    lon: String(kotaTerpilih.longitude),
+                  },
+                })
+              }
+            />
+          </>
+        )}
 
-      {pesanError && (
-        <View style={{ gap: spacing.kecil }}>
-          <Text accessibilityLabel={pesanError} accessibilityRole="alert">
-            {pesanError}
-          </Text>
-          <Button
-            title="Coba Lagi"
-            onPress={() => kotaTerpilih && pilihKota(kotaTerpilih)}
-            accessibilityLabel="Coba muat ulang data cuaca"
-          />
-        </View>
-      )}
-
-      {cuaca && kualitasUdara && kotaTerpilih && !sedangMemuat && (
-        <>
-          <WeatherCard
-            kota={kotaTerpilih.name}
-            suhu={cuaca.saatIni.suhu}
-            tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
-            indeksAQI={kualitasUdara.indeksAQI}
-          />
+        {kualitasUdara && (
           <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-            Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
-            {cuaca.saatIni.kecepatanAngin} km/j
+            Partikel halus: PM2.5 {kualitasUdara.pm25} µg/m³ • PM10{" "}
+            {kualitasUdara.pm10} µg/m³
           </Text>
-          <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-            Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
-            {cuaca.harian.suhuMaksimal[0]}°
-          </Text>
-          <Button
-            title="Tambahkan ke Favorit"
-            onPress={() =>
-              router.push({
-                pathname: "/tambah-favorit",
-                params: {
-                  id: String(kotaTerpilih.id),
-                  nama: kotaTerpilih.name,
-                  lat: String(kotaTerpilih.latitude),
-                  lon: String(kotaTerpilih.longitude),
-                },
-              })
-            }
-          />
-        </>
-      )}
+        )}
 
-      {kualitasUdara && (
-        <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-          Partikel halus: PM2.5 {kualitasUdara.pm25} µg/m³ • PM10{" "}
-          {kualitasUdara.pm10} µg/m³
-        </Text>
-      )}
-
-      <AtribusiCuaca />
+        <AtribusiCuaca />
+      </ScrollView>
     </SafeAreaView>
   );
 }
