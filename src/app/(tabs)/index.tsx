@@ -14,10 +14,17 @@ import { router, useFocusEffect } from "expo-router";
 import SearchBox from "../../components/SearchBox";
 import WeatherCard from "../../components/WeatherCard";
 import AtribusiCuaca from "../../components/AtribusiCuaca";
+import StatusData from "../../components/StatusData";
 import { useDebounce } from "../../hooks/use-debounce";
 import { cariKota } from "../../services/geocodingService";
-import { ambilCuaca } from "../../services/weatherService";
-import { ambilKualitasUdara } from "../../services/airQualityService";
+import {
+  ambilCuacaOfflineFirst,
+  BATAS_CACHE_MS,
+} from "../../services/cuacaRepository";
+import {
+  bersihkanCacheLama,
+  daftarKotaTersimpan,
+} from "../../services/cacheRepository";
 import { konversiTingkatAQI } from "../../services/weatherAdapter";
 import {
   mintaIzinLokasi,
@@ -26,17 +33,20 @@ import {
 import { ambilSemuaFavorit } from "../../services/favoritStorage";
 import { labelKodeCuaca } from "../../constants/weatherCodes";
 import { HasilGeocoding } from "../../types/geocoding";
-import { DataCuacaLengkap, DataKualitasUdara } from "../../types/weather";
+import {
+  HasilCuacaOffline,
+  RingkasanKotaTersimpan,
+} from "../../types/cache";
 import { typeScale, spacing } from "../../constants/styles";
 
 export default function HalamanUtama() {
   const [teksCari, setTeksCari] = useState("");
   const [hasilPencarian, setHasilPencarian] = useState<HasilGeocoding[]>([]);
   const [kotaTerpilih, setKotaTerpilih] = useState<HasilGeocoding | null>(null);
-  const [cuaca, setCuaca] = useState<DataCuacaLengkap | null>(null);
-  const [kualitasUdara, setKualitasUdara] = useState<DataKualitasUdara | null>(
-    null,
-  );
+  const [hasil, setHasil] = useState<HasilCuacaOffline | null>(null);
+  const [kotaTersimpan, setKotaTersimpan] = useState<
+    RingkasanKotaTersimpan[]
+  >([]);
   const [kataKunciSelesaiDicari, setKataKunciSelesaiDicari] = useState<
     string | null
   >(null);
@@ -60,6 +70,21 @@ export default function HalamanUtama() {
     adaKataKunci &&
     (teksCari !== teksTertunda || teksTertunda !== kataKunciSelesaiDicari);
   const errorCariTampil = adaKataKunci && !sedangCariTampil ? pesanCari : null;
+
+  async function muatKotaTersimpan() {
+    try {
+      setKotaTersimpan(await daftarKotaTersimpan());
+    } catch {
+      // Daftar tersimpan bersifat pelengkap, kegagalannya tidak boleh mengganggu
+    }
+  }
+
+  // Saat aplikasi dibuka: buang cache > 7 hari, lalu tampilkan daftar tersimpan
+  useEffect(() => {
+    bersihkanCacheLama(BATAS_CACHE_MS)
+      .then(muatKotaTersimpan)
+      .catch(() => {});
+  }, []);
 
   // Daftar id favorit dimuat ulang setiap kali tab ini difokuskan, karena
   // favorit bisa ditambah atau dihapus lewat modal dan tab Riwayat. Tanpa ini
@@ -108,31 +133,36 @@ export default function HalamanUtama() {
     setHasilPencarian([]);
     setPesanCari(null);
     setKotaTerpilih(null);
-    setCuaca(null);
-    setKualitasUdara(null);
+    setHasil(null);
     setPesanError(null);
     setSedangMemuat(false);
   }
 
-  async function pilihKota(kota: HasilGeocoding) {
+  async function pilihKota(kota: HasilGeocoding, paksaPerbarui = false) {
     setKotaTerpilih(kota);
     const idSaatIni = ++requestIdRef.current;
     setSedangMemuat(true);
     setPesanError(null);
     try {
-      // Cuaca dan kualitas udara saling independen, jadi dipanggil bersamaan.
-      const [dataCuaca, dataAQI] = await Promise.all([
-        ambilCuaca(kota.latitude, kota.longitude),
-        ambilKualitasUdara(kota.latitude, kota.longitude),
-      ]);
+      const data = await ambilCuacaOfflineFirst(
+        {
+          id: kota.id,
+          nama: kota.name,
+          latitude: kota.latitude,
+          longitude: kota.longitude,
+        },
+        { paksaPerbarui },
+      );
       if (idSaatIni !== requestIdRef.current) return; // hasil basi, abaikan
-      setCuaca(dataCuaca);
-      setKualitasUdara(dataAQI);
+      setHasil(data);
+      muatKotaTersimpan();
     } catch {
       if (idSaatIni !== requestIdRef.current) return;
-      setCuaca(null);
-      setKualitasUdara(null);
-      setPesanError("Gagal memuat data cuaca. Periksa koneksi internet Anda.");
+      // Data lama dikosongkan supaya tidak tampil di bawah nama kota yang salah
+      setHasil(null);
+      setPesanError(
+        "Belum ada data tersimpan dan tidak ada koneksi internet. Sambungkan internet lalu coba lagi.",
+      );
     } finally {
       if (idSaatIni === requestIdRef.current) setSedangMemuat(false);
     }
@@ -245,6 +275,42 @@ export default function HalamanUtama() {
           </TouchableOpacity>
         ))}
 
+        {kotaTersimpan.length > 0 && (
+          <View style={{ gap: spacing.kecil }}>
+            <Text
+              accessibilityRole="header"
+              style={{ fontSize: typeScale.subjudul, fontWeight: "600" }}
+            >
+              Tersimpan di perangkat (bisa dibuka offline)
+            </Text>
+            {kotaTersimpan.map((k) => (
+              <TouchableOpacity
+                key={k.kunci}
+                onPress={() =>
+                  pilihKota({
+                    id: k.id,
+                    name: k.nama,
+                    latitude: k.latitude,
+                    longitude: k.longitude,
+                    country: "",
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Lihat cuaca kota tersimpan ${k.nama}`}
+                style={{
+                  padding: spacing.kecil,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#B7E4D4",
+                  backgroundColor: "#F4FBF8",
+                }}
+              >
+                <Text style={{ fontSize: typeScale.isi }}>{k.nama}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {sedangMemuat && (
           <ActivityIndicator accessibilityLabel="Sedang memuat data cuaca" />
         )}
@@ -256,28 +322,41 @@ export default function HalamanUtama() {
             </Text>
             <Button
               title="Coba Lagi"
-              onPress={() => kotaTerpilih && pilihKota(kotaTerpilih)}
+              onPress={() => kotaTerpilih && pilihKota(kotaTerpilih, true)}
               accessibilityLabel="Coba muat ulang data cuaca"
             />
           </View>
         )}
 
-        {cuaca && kualitasUdara && kotaTerpilih && !sedangMemuat && (
+        {hasil && kotaTerpilih && !sedangMemuat && (
           <>
+            <StatusData
+              sumber={hasil.sumber}
+              disimpanPada={hasil.disimpanPada}
+            />
             <WeatherCard
               kota={kotaTerpilih.name}
-              suhu={cuaca.saatIni.suhu}
-              tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
-              indeksAQI={kualitasUdara.indeksAQI}
+              suhu={hasil.cuaca.saatIni.suhu}
+              tingkatAQI={konversiTingkatAQI(hasil.kualitasUdara.indeksAQI)}
+              indeksAQI={hasil.kualitasUdara.indeksAQI}
             />
             <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-              Kondisi: {labelKodeCuaca(cuaca.saatIni.kodeCuaca)} • Angin{" "}
-              {cuaca.saatIni.kecepatanAngin} km/j
+              Kondisi: {labelKodeCuaca(hasil.cuaca.saatIni.kodeCuaca)} • Angin{" "}
+              {hasil.cuaca.saatIni.kecepatanAngin} km/j
             </Text>
             <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-              Hari ini: {cuaca.harian.suhuMinimal[0]}° -{" "}
-              {cuaca.harian.suhuMaksimal[0]}°
+              Hari ini: {hasil.cuaca.harian.suhuMinimal[0]}° -{" "}
+              {hasil.cuaca.harian.suhuMaksimal[0]}°
             </Text>
+            <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
+              Partikel halus: PM2.5 {hasil.kualitasUdara.pm25} µg/m³ • PM10{" "}
+              {hasil.kualitasUdara.pm10} µg/m³
+            </Text>
+            <Button
+              title="Perbarui Sekarang"
+              onPress={() => pilihKota(kotaTerpilih, true)}
+              accessibilityLabel="Paksa perbarui data cuaca dari internet"
+            />
             {!kotaSudahFavorit && (
               <Button
                 title="Tambahkan ke Favorit"
@@ -295,13 +374,6 @@ export default function HalamanUtama() {
               />
             )}
           </>
-        )}
-
-        {kualitasUdara && (
-          <Text style={{ fontSize: typeScale.keterangan, color: "#888" }}>
-            Partikel halus: PM2.5 {kualitasUdara.pm25} µg/m³ • PM10{" "}
-            {kualitasUdara.pm10} µg/m³
-          </Text>
         )}
 
         <AtribusiCuaca />
