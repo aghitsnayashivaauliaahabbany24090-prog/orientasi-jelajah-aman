@@ -2,6 +2,10 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Status Data: cache-segar, cache-basi, dan first-run offline
+
+Aplikasi ini menerapkan strategi offline-first dengan tiga kemungkinan asal data yang ditampilkan oleh komponen `StatusData`. **Cache-segar** berarti data tersimpan di SQLite berumur kurang dari 30 menit, sehingga langsung dipakai tanpa memanggil internet. **Cache-basi** terjadi saat koneksi gagal dan data lama tetap ditampilkan sebagai cadangan dengan peringatan bahwa informasinya mungkin sudah usang. **First-run offline** adalah kondisi belum ada koneksi sekaligus belum ada data tersimpan sama sekali, sehingga pengguna diminta mencoba lagi setelah internet tersedia. Label status data penting bagi pengguna agar mereka selalu tahu apakah yang dilihatnya data real-time dari internet atau sekadar simpanan di perangkat, sehingga tidak salah mengambil keputusan berdasarkan informasi yang sudah usang.
+
 ## Get started
 
 1. Install dependencies

@@ -213,7 +213,7 @@ export default function HalamanUtama() {
           onPress={gunakanLokasiSaatIni}
         />
 
-        {pesanLokasi && <Text>{pesanLokasi}</Text>}
+        {pesanLokasi && <Text accessibilityLabel={pesanLokasi}>{pesanLokasi}</Text>}
 
         {sedangCariTampil && (
           <ActivityIndicator accessibilityLabel="Sedang mencari kota" />
