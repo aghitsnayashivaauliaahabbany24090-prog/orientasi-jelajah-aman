@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import SearchBox from "../../components/SearchBox";
 import WeatherCard from "../../components/WeatherCard";
 import AtribusiCuaca from "../../components/AtribusiCuaca";
@@ -31,6 +31,7 @@ import {
   ambilKoordinatSaatIni,
 } from "../../services/locationService";
 import { ambilSemuaFavorit } from "../../services/favoritStorage";
+import { simpanRiwayatPencarian } from "../../services/riwayatPencarian";
 import { labelKodeCuaca } from "../../constants/weatherCodes";
 import { HasilGeocoding } from "../../types/geocoding";
 import {
@@ -38,8 +39,15 @@ import {
   RingkasanKotaTersimpan,
 } from "../../types/cache";
 import { typeScale, spacing } from "../../constants/styles";
+import { useAppTheme } from "../../contexts/ThemeContext";
 
 export default function HalamanUtama() {
+  const params = useLocalSearchParams<{
+    kotaCari?: string;
+    lat?: string;
+    lon?: string;
+    id?: string;
+  }>();
   const [teksCari, setTeksCari] = useState("");
   const [hasilPencarian, setHasilPencarian] = useState<HasilGeocoding[]>([]);
   const [kotaTerpilih, setKotaTerpilih] = useState<HasilGeocoding | null>(null);
@@ -58,6 +66,7 @@ export default function HalamanUtama() {
   const [daftarIdFavorit, setDaftarIdFavorit] = useState<number[]>([]);
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
+  const { colors } = useAppTheme();
 
   const idPermintaan = useRef(0);
   const requestIdRef = useRef(0);
@@ -85,6 +94,22 @@ export default function HalamanUtama() {
       .then(muatKotaTersimpan)
       .catch(() => {});
   }, []);
+
+  // Jika ada parameter dari riwayat, otomatis pilih kota
+  useEffect(() => {
+    if (params.kotaCari && params.lat && params.lon) {
+      const kota: HasilGeocoding = {
+        id: params.id ? Number(params.id) : -999,
+        name: params.kotaCari,
+        latitude: Number(params.lat),
+        longitude: Number(params.lon),
+        country: "",
+      };
+      pilihKota(kota);
+      // Bersihkan parameter setelah dipakai
+      router.setParams({ kotaCari: undefined, lat: undefined, lon: undefined, id: undefined });
+    }
+  }, [params.kotaCari, params.lat, params.lon, params.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Daftar id favorit dimuat ulang setiap kali tab ini difokuskan, karena
   // favorit bisa ditambah atau dihapus lewat modal dan tab Riwayat. Tanpa ini
@@ -166,6 +191,12 @@ export default function HalamanUtama() {
     } finally {
       if (idSaatIni === requestIdRef.current) setSedangMemuat(false);
     }
+    // Simpan ke riwayat pencarian (maksimal 10, hindari duplikat)
+    try {
+      await simpanRiwayatPencarian(kota);
+    } catch {
+      // ignore
+    }
   }
 
   async function gunakanLokasiSaatIni() {
@@ -199,6 +230,7 @@ export default function HalamanUtama() {
     <SafeAreaView
       style={{
         flex: 1,
+        backgroundColor: colors.background,
         padding: isTablet ? spacing.besar : spacing.sedang,
       }}
     >
@@ -268,10 +300,11 @@ export default function HalamanUtama() {
               padding: spacing.kecil,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: "#D5DCE3",
+              borderColor: colors.backgroundElement,
+              backgroundColor: colors.backgroundElement,
             }}
           >
-            <Text style={{ fontSize: typeScale.isi }}>{kota.name}</Text>
+            <Text style={{ fontSize: typeScale.isi, color: colors.text }}>{kota.name}</Text>
           </TouchableOpacity>
         ))}
 
@@ -279,7 +312,7 @@ export default function HalamanUtama() {
           <View style={{ gap: spacing.kecil }}>
             <Text
               accessibilityRole="header"
-              style={{ fontSize: typeScale.subjudul, fontWeight: "600" }}
+              style={{ fontSize: typeScale.subjudul, fontWeight: "600", color: colors.text }}
             >
               Tersimpan di perangkat (bisa dibuka offline)
             </Text>
@@ -301,11 +334,11 @@ export default function HalamanUtama() {
                   padding: spacing.kecil,
                   borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: "#B7E4D4",
-                  backgroundColor: "#F4FBF8",
+                  borderColor: colors.backgroundSelected,
+                  backgroundColor: colors.backgroundElement,
                 }}
               >
-                <Text style={{ fontSize: typeScale.isi }}>{k.nama}</Text>
+                <Text style={{ fontSize: typeScale.isi, color: colors.text }}>{k.nama}</Text>
               </TouchableOpacity>
             ))}
           </View>
